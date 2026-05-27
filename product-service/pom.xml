@@ -33,6 +33,22 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
+        <!-- Add inside <dependencies> -->
+
+        <!-- Testcontainers — spins up real PostgreSQL in Docker during tests -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>1.19.7</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.19.7</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Connection pool for Redis -->
         <dependency>
             <groupId>org.apache.commons</groupId>
