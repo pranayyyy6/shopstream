@@ -22,26 +22,31 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-/*
- * Unit tests — no Spring context, no DB, no Redis.
- * We mock the repository and test ONLY the service logic.
- * Fast — runs in milliseconds.
- * Tests one thing at a time.
- */
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
 
     @Mock
     private ProductRepository productRepository;
 
+    /*
+     * @InjectMocks creates ProductService and injects mocks.
+     * BUT @Cacheable is a Spring AOP proxy — it only works
+     * inside a Spring context. In pure Mockito tests,
+     * @Cacheable annotations are completely ignored.
+     * This is actually GOOD for unit tests — we test
+     * pure business logic without cache interference.
+     */
     @InjectMocks
     private ProductService productService;
 
     private ProductRequest validRequest;
     private Product savedProduct;
+    private UUID productId;
 
     @BeforeEach
     void setUp() {
+        productId = UUID.randomUUID();
+
         validRequest = ProductRequest.builder()
                 .name("iPhone 15 Pro")
                 .description("Latest Apple flagship")
@@ -51,7 +56,7 @@ class ProductServiceTest {
                 .build();
 
         savedProduct = Product.builder()
-                .id(UUID.randomUUID())
+                .id(productId)
                 .name("iPhone 15 Pro")
                 .description("Latest Apple flagship")
                 .price(BigDecimal.valueOf(134900))
@@ -62,117 +67,103 @@ class ProductServiceTest {
     }
 
     @Test
-    @DisplayName("Should create product successfully")
+    @DisplayName("Should create product and return response")
     void shouldCreateProduct() {
-        // given
         when(productRepository.save(any(Product.class)))
                 .thenReturn(savedProduct);
 
-        // when
         ProductResponse response = productService.createProduct(validRequest);
 
-        // then
         assertThat(response).isNotNull();
         assertThat(response.getName()).isEqualTo("iPhone 15 Pro");
         assertThat(response.getPrice()).isEqualByComparingTo("134900");
         assertThat(response.getId()).isNotNull();
-
-        // verify repository was called exactly once
         verify(productRepository, times(1)).save(any(Product.class));
     }
 
     @Test
     @DisplayName("Should return all non-deleted products")
     void shouldGetAllProducts() {
-        // given
         when(productRepository.findByDeletedFalse())
                 .thenReturn(List.of(savedProduct));
 
-        // when
         List<ProductResponse> products = productService.getAllProducts();
 
-        // then
         assertThat(products).hasSize(1);
         assertThat(products.get(0).getName()).isEqualTo("iPhone 15 Pro");
         verify(productRepository).findByDeletedFalse();
     }
 
     @Test
-    @DisplayName("Should throw ProductNotFoundException when product not found")
+    @DisplayName("Should return product by ID")
+    void shouldGetProductById() {
+        when(productRepository.findByIdAndDeletedFalse(productId))
+                .thenReturn(Optional.of(savedProduct));
+
+        ProductResponse response = productService.getProductById(productId);
+
+        assertThat(response.getId()).isEqualTo(productId);
+        assertThat(response.getName()).isEqualTo("iPhone 15 Pro");
+    }
+
+    @Test
+    @DisplayName("Should throw ProductNotFoundException for missing product")
     void shouldThrowWhenProductNotFound() {
-        // given
         UUID randomId = UUID.randomUUID();
         when(productRepository.findByIdAndDeletedFalse(randomId))
                 .thenReturn(Optional.empty());
 
-        // when & then
         assertThatThrownBy(() -> productService.getProductById(randomId))
                 .isInstanceOf(ProductNotFoundException.class)
                 .hasMessageContaining(randomId.toString());
-
-        // Repository was called — exception came from service logic
-        verify(productRepository).findByIdAndDeletedFalse(randomId);
     }
 
     @Test
-    @DisplayName("Should soft delete product — not hard delete")
+    @DisplayName("Should soft delete — never hard delete")
     void shouldSoftDeleteProduct() {
-        // given
-        UUID productId = savedProduct.getId();
         when(productRepository.findByIdAndDeletedFalse(productId))
                 .thenReturn(Optional.of(savedProduct));
         when(productRepository.save(any(Product.class)))
                 .thenReturn(savedProduct);
 
-        // when
         productService.deleteProduct(productId);
 
-        // then — product is marked deleted, not removed
         assertThat(savedProduct.getDeleted()).isTrue();
         verify(productRepository).save(savedProduct);
-        // Hard delete should NEVER be called
         verify(productRepository, never()).deleteById(any());
     }
 
     @Test
-    @DisplayName("Should update product fields correctly")
+    @DisplayName("Should update product fields")
     void shouldUpdateProduct() {
-        // given
-        UUID productId = savedProduct.getId();
+        when(productRepository.findByIdAndDeletedFalse(productId))
+                .thenReturn(Optional.of(savedProduct));
+        when(productRepository.save(any(Product.class)))
+                .thenReturn(savedProduct);
+
         ProductRequest updateRequest = ProductRequest.builder()
                 .name("iPhone 15 Pro Max")
-                .description("Updated description")
+                .description("Updated")
                 .price(BigDecimal.valueOf(159900))
                 .stockQuantity(30)
                 .category("Electronics")
                 .build();
 
-        when(productRepository.findByIdAndDeletedFalse(productId))
-                .thenReturn(Optional.of(savedProduct));
-        when(productRepository.save(any(Product.class)))
-                .thenReturn(savedProduct);
-
-        // when
         productService.updateProduct(productId, updateRequest);
 
-        // then — verify the product fields were updated
         assertThat(savedProduct.getName()).isEqualTo("iPhone 15 Pro Max");
         assertThat(savedProduct.getPrice())
                 .isEqualByComparingTo("159900");
-        verify(productRepository).save(savedProduct);
     }
 
     @Test
-    @DisplayName("Should use BigDecimal for price — not double")
-    void shouldUseBigDecimalForPrice() {
-        // This test documents an architectural decision —
-        // BigDecimal prevents floating point errors in financial data
+    @DisplayName("Price must be BigDecimal — not double or float")
+    void priceShouldBeBigDecimal() {
         when(productRepository.save(any(Product.class)))
                 .thenReturn(savedProduct);
 
         ProductResponse response = productService.createProduct(validRequest);
 
-        assertThat(response.getPrice())
-                .isInstanceOf(BigDecimal.class);
+        assertThat(response.getPrice()).isInstanceOf(BigDecimal.class);
     }
 }

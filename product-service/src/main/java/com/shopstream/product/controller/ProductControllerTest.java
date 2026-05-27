@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,12 +22,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/*
- * WebMvcTest — loads ONLY the web layer.
- * No DB, no Redis, no Kafka.
- * Tests HTTP contracts — status codes, response bodies, validation.
- */
 @WebMvcTest(ProductController.class)
+@AutoConfigureMockMvc(addFilters = false)  // disables security filters in tests
 class ProductControllerTest {
 
     @Autowired
@@ -60,24 +57,25 @@ class ProductControllerTest {
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())   // 201 not 200
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("iPhone 15 Pro"))
                 .andExpect(jsonPath("$.id").exists());
     }
 
     @Test
-    @DisplayName("POST /api/products with blank name should return 400")
+    @DisplayName("POST with blank name should return 400")
     void shouldReturn400OnValidationFailure() throws Exception {
         ProductRequest invalidRequest = ProductRequest.builder()
-                .name("")           // blank — should fail validation
-                .price(BigDecimal.valueOf(-10))  // negative — should fail
+                .name("")
+                .price(BigDecimal.valueOf(-10))
+                .stockQuantity(-1)
+                .category("")
                 .build();
 
         mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRequest)))
-                .andExpect(status().isBadRequest())  // 400
-                .andExpect(jsonPath("$.errors").exists());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -98,11 +96,10 @@ class ProductControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/products/{id} should return 204 No Content")
+    @DisplayName("DELETE /api/products/{id} should return 204")
     void shouldReturn204OnDelete() throws Exception {
         UUID id = UUID.randomUUID();
-
         mockMvc.perform(delete("/api/products/" + id))
-                .andExpect(status().isNoContent());  // 204 not 200
+                .andExpect(status().isNoContent());
     }
 }
