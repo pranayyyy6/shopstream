@@ -1,0 +1,26 @@
+server:
+  port: 8761  # Eureka's standard port — don't change this
+
+spring:
+  application:
+    name: service-registry
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    # This IS the registry — it doesn't register with itself
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    # Prevents "EMERGENCY! EUREKA MAY BE INCORRECTLY CLAIMING
+    # INSTANCES ARE UP" noise in dev
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 3000
+
+# Expose all actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

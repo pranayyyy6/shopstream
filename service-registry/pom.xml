@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Points to parent — inherits all versions from there -->
+    <parent>
+        <groupId>com.shopstream</groupId>
+        <artifactId>shopstream</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>service-registry</artifactId>
+
+    <dependencies>
+        <!--
+            This ONE dependency turns this app into a full Eureka server.
+            All other services will register themselves here.
+        -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+        </dependency>
+
+        <!--
+            Actuator exposes health endpoints.
+            http://localhost:8761/actuator/health
+            Used by Docker and Kubernetes to check if service is alive.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

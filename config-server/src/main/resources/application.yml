@@ -1,0 +1,25 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: config-server
+  profiles:
+    active: native   # reads config from filesystem, not Git (for local dev)
+  cloud:
+    config:
+      server:
+        native:
+          # Looks for product-service.yml, order-service.yml etc. here
+          search-locations: classpath:/configs
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
