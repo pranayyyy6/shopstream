@@ -7,27 +7,47 @@ spring:
   cloud:
     gateway:
       routes:
-        # Auth is PUBLIC — no filter
+        # Auth — public, no filters
         - id: auth-service
           uri: lb://auth-service
           predicates:
             - Path=/api/auth/**
 
-        # Products — protected by JWT filter
+        # Products — JWT + Circuit Breaker
         - id: product-service
           uri: lb://product-service
           predicates:
             - Path=/api/products/**
           filters:
             - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: productCircuitBreaker
+                fallbackUri: forward:/fallback/products
 
-        # Orders — protected by JWT filter
+        # Orders — JWT + Circuit Breaker
         - id: order-service
           uri: lb://order-service
           predicates:
             - Path=/api/orders/**
           filters:
             - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: orderCircuitBreaker
+                fallbackUri: forward:/fallback/orders
+
+        # Inventory — JWT + Circuit Breaker
+        - id: inventory-service
+          uri: lb://inventory-service
+          predicates:
+            - Path=/api/inventory/**
+          filters:
+            - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: inventoryCircuitBreaker
+                fallbackUri: forward:/fallback/inventory
 
       globalcors:
         cors-configurations:
@@ -36,7 +56,32 @@ spring:
             allowedMethods: "*"
             allowedHeaders: "*"
 
-# Same secret as auth-service — gateway validates independently
+      # Resilience4j circuit breaker config
+      default-filters:
+        - name: Retry
+          args:
+            retries: 3
+            statuses: BAD_GATEWAY
+
+# Circuit breaker settings
+resilience4j:
+  circuitbreaker:
+    instances:
+      productCircuitBreaker:
+        # Open circuit after 5 failures
+        slidingWindowSize: 5
+        # Wait 10s before trying again
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+      orderCircuitBreaker:
+        slidingWindowSize: 5
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+      inventoryCircuitBreaker:
+        slidingWindowSize: 5
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+
 jwt:
   secret: shopstream-super-secret-jwt-key-2024-make-it-long-enough
 
